@@ -1,94 +1,80 @@
-# College Fitness Club — Attendance Tracker (Firebase version)
+# College Fitness Club — Attendance Tracker (Firebase, personal QR check-in)
 
-A free, no-domain-needed website for tracking gym attendance via QR check-in.
+A free, no-domain-needed website for tracking gym attendance. Each member
+gets their own personal QR code — scan it, attendance logs automatically,
+no typing.
 
 - `index.html` — public homepage with live stats
-- `checkin.html` — the page your QR code points to
-- `admin.html` — password-protected dashboard to add members & view logs
+- `checkin.html` — the page a member's personal QR code links to
+- `admin.html` — password-protected dashboard: add members, generate/download their QR codes, view logs
 - `firebase-config.js` — where you paste your Firebase project keys
 - `firestore.rules` — database security rules
 - `style.css` — shared design
 
 ---
 
-## 1. Create your database (Firebase)
+## How check-in works now
 
-1. Go to [console.firebase.google.com](https://console.firebase.google.com) → **Add project** → give it a name (e.g. `fitness-club`) → follow the prompts (you can skip Google Analytics) → **Create project**.
-2. In the left sidebar, go to **Build → Firestore Database** → **Create database** → choose a location close to you → start in **production mode**.
-3. Once created, click the **Rules** tab in Firestore. Delete everything there and paste in the entire contents of `firestore.rules` → **Publish**.
-4. In the left sidebar, go to **Build → Authentication** → **Get started** → enable the **Email/Password** sign-in method.
-5. Still in Authentication, go to the **Users** tab → **Add user** → enter an email + password for yourself. This is your admin login for `admin.html`.
+1. An admin adds a member by name + roll number in `admin.html`.
+2. The site generates a **random, unguessable code** for that member and shows a QR code on screen, downloadable as a PNG.
+3. The admin prints/shares that QR code with the member — it's theirs, like a gym ID card.
+4. At the gym, the member scans their own QR code with their phone camera. It opens `checkin.html?token=...`, which **automatically logs their attendance** — no form, no typing.
+5. Scanning the same code again the same day shows "already checked in" instead of logging a duplicate.
 
-## 2. Get your web app config
+Nobody can check in by guessing or typing a roll number anymore — the database is set up so the secret code can only be *used* (scan a real QR), never *listed or searched* by a visitor to the site.
 
-1. Click the gear icon next to **Project Overview** → **Project settings**.
-2. Scroll to **Your apps** → click the **</>** (web) icon → give the app a nickname → **Register app**.
-3. Firebase shows you a `firebaseConfig` object with your `apiKey`, `authDomain`, `projectId`, etc. Copy these values.
-
-## 3. Connect the site to your database
-
-Open `firebase-config.js` and replace the placeholder values with the ones you just copied:
-
-```js
-const firebaseConfig = {
-  apiKey: "AIza...",
-  authDomain: "fitness-club-xxxxx.firebaseapp.com",
-  projectId: "fitness-club-xxxxx",
-  storageBucket: "fitness-club-xxxxx.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
-};
-```
-
-Save the file.
-
-## 4. Put the code on GitHub
-
-1. Go to [github.com](https://github.com) → sign up free (if you don't have an account).
-2. Click **New repository**, name it e.g. `fitness-club`, keep it public, create it.
-3. Upload all the files in this folder (`index.html`, `checkin.html`, `admin.html`, `firebase-config.js`, `style.css`, `firestore.rules`) using the **"uploading an existing file"** link on the repo page. Commit.
-
-## 5. Deploy for free (Vercel)
-
-1. Go to [vercel.com](https://vercel.com) → sign up using your GitHub account.
-2. Click **Add New → Project**, select your `fitness-club` repo.
-3. Leave all settings as default (no build step needed, it's plain HTML) → **Deploy**.
-4. In under a minute you'll get a free public link like:
-   `https://fitness-club-yourname.vercel.app`
-
-That link is your website — anyone can visit it, no domain purchase needed.
-
-**One extra Firebase step:** go back to Firebase Console → Authentication → **Settings** tab → **Authorized domains** → **Add domain** → paste in your Vercel domain (e.g. `fitness-club-yourname.vercel.app`). Without this, login on the live site will be blocked.
-
-## 6. Add your first members
-
-Go to `https://your-link.vercel.app/admin.html`, log in with the email/password you created in step 1.5, and add each gym member's name + roll number under **Add Member**.
-
-## 7. Generate the QR code
-
-Take your check-in link:
-`https://your-link.vercel.app/checkin.html`
-
-Paste it into any free QR generator (e.g. [qr-code-generator.com](https://www.qr-code-generator.com) or [qrcode-monkey.com](https://www.qrcode-monkey.com)), download the image, and print it out for the gym entrance.
-
-## 8. Test it
-
-1. Scan the QR code with your phone.
-2. Enter a roll number you added in step 6.
-3. Check the homepage — it should show up in "Recent check-ins" and the stats should update.
+**Worth knowing:** this stops guessing and typo-checking, but it can't stop someone deliberately sharing a photo of their own QR code with a friend — same as sharing a physical gym ID. If that becomes a real problem, the next upgrade is having staff scan members' codes at the door (so a person visually confirms who's checking in) instead of a fully self-serve scan.
 
 ---
 
-### How it works
+## 1. Create your database (Firebase)
 
-- Each member's **roll number is the document ID** in the `members` collection in Firestore — this makes check-in fast (a single direct lookup, no search query needed).
-- The **check-in page** looks up that roll number and, if it exists, adds a new document to the `attendance` collection with a server timestamp. No login needed — that's what makes it fast enough for people to use at the gym door.
-- The **admin page** requires a Firebase Auth login, so only club admins can add/remove members.
-- The **homepage** reads aggregate counts and a recent-activity feed — visible to everyone, no login.
-- `firestore.rules` enforces all of this at the database level: anyone can read, anyone can check in (but only for a roll number that's actually registered), and only a logged-in admin can add/edit/delete members or attendance records.
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) → **Add project** → name it (e.g. `fitness-club`) → **Create project**.
+2. **Build → Firestore Database** → **Create database** → pick a nearby location → **production mode**.
+3. Click the **Rules** tab → delete everything → paste in the entire contents of `firestore.rules` → **Publish**.
+4. **Build → Authentication** → **Get started** → enable **Email/Password** sign-in.
+5. **Authentication → Users** → **Add user** → this is your admin login for `admin.html`.
 
-### Known limitations (worth knowing as a club project, not production banking software)
+## 2. Get your web app config
 
-- Anyone who knows a friend's roll number could check in for them — there's no identity verification. If this becomes a problem, the natural upgrade is a **personal QR code per student** (generated at signup, scanned by staff) instead of typing a roll number.
-- Roll numbers and names in the `members` collection are publicly readable (needed for the check-in page to work) but not editable by anyone except an admin.
-- Firebase's free "Spark" plan comfortably handles a college club's traffic at no cost.
+1. Gear icon → **Project settings** → scroll to **Your apps** → click **</>** to register a web app.
+2. Copy the `firebaseConfig` object it shows you.
+
+## 3. Connect the site
+
+Paste your real values into `firebase-config.js`, replacing the placeholders. Save.
+
+## 4. Push to GitHub, deploy on Vercel
+
+Same as before:
+1. Create a GitHub repo, upload all the files.
+2. On [vercel.com](https://vercel.com), import that repo, leave settings default, **Deploy**.
+3. Copy your live link (e.g. `fitness-club-nitn.vercel.app`).
+4. Back in Firebase → **Authentication → Settings → Authorized domains → Add domain** → paste your Vercel domain.
+
+## 5. Register members and print their QR codes
+
+1. Go to `your-link.vercel.app/admin.html`, log in.
+2. Under **Add Member**, enter each member's name + roll number → **Add & generate QR**.
+3. A QR code appears immediately — click **Download QR** and print it (or share the image with the member directly, e.g. via WhatsApp).
+4. Need to reprint someone's code later? Find them in **All Members** → **View QR**.
+
+## 6. Test it
+
+1. Open a member's downloaded QR image on your phone, or print it.
+2. Scan it with a phone camera — it should open the check-in page and show "Checked in" with their name, automatically.
+3. Scan it again — it should say "already in" instead of logging twice.
+4. Check the homepage — stats and recent check-ins update.
+
+---
+
+### How the security actually works
+
+- `members/{rollNumber}` — public name + roll number only, no secrets. Anyone can view (needed for the homepage/admin list), only an admin can add/edit.
+- `tokens/{token}` — the token (a random 128-bit ID) is the document's ID. Anyone can *fetch one exact token* (which is what scanning a QR does), but **nobody can list or browse this collection**, so tokens can't be discovered — only used.
+- `admin_tokens/{rollNumber}` — fully private, admin-only. Lets an admin look up a member's token again later to reprint their QR.
+- `attendance` — public to insert (so check-in works without login) and public to read (so the homepage can show stats).
+
+### Free tier notes
+
+Firebase's free "Spark" plan comfortably covers a college club's traffic and this app's usage.

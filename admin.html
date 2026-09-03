@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin — Fitness Club</title>
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -40,15 +41,22 @@
   <form id="add-member-form" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
     <input type="text" id="new-name" placeholder="Full name" required style="flex:2; min-width:180px;">
     <input type="text" id="new-roll" placeholder="Roll number" required style="flex:1; min-width:140px;">
-    <button type="submit" style="flex:0 0 auto;">Add</button>
+    <button type="submit" style="flex:0 0 auto;">Add & generate QR</button>
   </form>
-  <div id="add-member-msg" style="margin-bottom:40px; font-size:14px;"></div>
+  <div id="add-member-msg" style="margin-bottom:16px; font-size:14px;"></div>
+
+  <!-- Freshly generated QR appears here right after adding a member -->
+  <div id="new-qr-card" class="card" style="display:none; margin-bottom:40px; text-align:center; max-width:280px;">
+    <div id="new-qr-canvas"></div>
+    <div id="new-qr-name" style="margin:12px 0 4px; font-weight:600;"></div>
+    <a id="new-qr-download" download="checkin-qr.png" class="btn-outline" style="display:inline-block; text-decoration:none; margin-top:8px; padding:10px 16px; font-size:14px;">Download QR</a>
+  </div>
 
   <h2 class="display" style="font-size:24px; margin-bottom:12px;">ALL MEMBERS</h2>
-  <div class="card" style="padding:0; overflow:hidden; margin-bottom:40px; max-height:320px; overflow-y:auto;">
+  <div class="card" style="padding:0; overflow:hidden; margin-bottom:40px; max-height:360px; overflow-y:auto;">
     <table>
-      <thead><tr><th>Name</th><th>Roll No.</th></tr></thead>
-      <tbody id="members-body"><tr><td colspan="2" style="color:var(--ink-dim); padding:16px 12px;">Loading…</td></tr></tbody>
+      <thead><tr><th>Name</th><th>Roll No.</th><th></th></tr></thead>
+      <tbody id="members-body"><tr><td colspan="3" style="color:var(--ink-dim); padding:16px 12px;">Loading…</td></tr></tbody>
     </table>
   </div>
 
@@ -58,6 +66,16 @@
       <thead><tr><th>Name</th><th>Roll No.</th><th>Time</th></tr></thead>
       <tbody id="attendance-body"><tr><td colspan="3" style="color:var(--ink-dim); padding:16px 12px;">Loading…</td></tr></tbody>
     </table>
+  </div>
+</div>
+
+<!-- Simple modal for re-viewing an existing member's QR -->
+<div id="qr-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; z-index:10;">
+  <div class="card" style="max-width:280px; text-align:center; position:relative;">
+    <button id="qr-modal-close" class="btn-outline" style="position:absolute; top:-14px; right:-14px; padding:6px 10px; font-size:13px;">✕</button>
+    <div id="modal-qr-canvas"></div>
+    <div id="modal-qr-name" style="margin:12px 0 4px; font-weight:600;"></div>
+    <a id="modal-qr-download" download="checkin-qr.png" class="btn-outline" style="display:inline-block; text-decoration:none; margin-top:8px; padding:10px 16px; font-size:14px;">Download QR</a>
   </div>
 </div>
 
@@ -72,6 +90,7 @@
 
   const loginView = document.getElementById('login-view');
   const dashboardView = document.getElementById('dashboard-view');
+  const CHECKIN_BASE_URL = window.location.origin + '/checkin.html';
 
   onAuthStateChanged(auth, (user) => {
     if (user) {
@@ -106,6 +125,7 @@
     const full_name = document.getElementById('new-name').value.trim();
     const roll_number = document.getElementById('new-roll').value.trim();
     const msg = document.getElementById('add-member-msg');
+    document.getElementById('new-qr-card').style.display = 'none';
 
     try {
       const memberRef = doc(db, 'members', roll_number);
@@ -116,10 +136,16 @@
         return;
       }
 
+      const token = crypto.randomUUID();
+
       await setDoc(memberRef, { full_name, roll_number, created_at: serverTimestamp() });
-      msg.textContent = `Added ${full_name}.`;
+      await setDoc(doc(db, 'tokens', token), { roll_number, full_name, created_at: serverTimestamp() });
+      await setDoc(doc(db, 'admin_tokens', roll_number), { token, created_at: serverTimestamp() });
+
+      msg.textContent = `Added ${full_name}. QR code below — download and print it for them.`;
       msg.className = 'msg-ok';
       e.target.reset();
+      renderQr('new-qr-canvas', 'new-qr-name', 'new-qr-download', token, full_name, true);
       loadMembers();
     } catch (err) {
       msg.textContent = 'Could not add member. Try again.';
@@ -127,18 +153,52 @@
     }
   });
 
+  function renderQr(canvasContainerId, nameElId, downloadElId, token, fullName, isNewCard) {
+    const url = `${CHECKIN_BASE_URL}?token=${token}`;
+    const container = document.getElementById(canvasContainerId);
+    container.innerHTML = '';
+    const canvas = document.createElement('canvas');
+    container.appendChild(canvas);
+    QRCode.toCanvas(canvas, url, { width: 220, margin: 1, color: { dark: '#101114', light: '#F4F4EF' } }, () => {
+      document.getElementById(downloadElId).href = canvas.toDataURL('image/png');
+    });
+    document.getElementById(nameElId).textContent = fullName;
+    if (isNewCard) document.getElementById('new-qr-card').style.display = 'block';
+  }
+
   async function loadMembers() {
     const body = document.getElementById('members-body');
     const snap = await getDocs(collection(db, 'members'));
 
     if (snap.empty) {
-      body.innerHTML = '<tr><td colspan="2" style="color:var(--ink-dim); padding:16px 12px;">No members yet.</td></tr>';
+      body.innerHTML = '<tr><td colspan="3" style="color:var(--ink-dim); padding:16px 12px;">No members yet.</td></tr>';
       return;
     }
 
     const rows = snap.docs.map(d => d.data()).sort((a, b) => a.full_name.localeCompare(b.full_name));
-    body.innerHTML = rows.map(m => `<tr><td>${m.full_name}</td><td>${m.roll_number}</td></tr>`).join('');
+    body.innerHTML = rows.map(m => `
+      <tr>
+        <td>${m.full_name}</td>
+        <td>${m.roll_number}</td>
+        <td><button class="btn-outline view-qr-btn" data-roll="${m.roll_number}" data-name="${m.full_name}" style="padding:6px 12px; font-size:13px;">View QR</button></td>
+      </tr>
+    `).join('');
+
+    document.querySelectorAll('.view-qr-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const roll = btn.dataset.roll;
+        const name = btn.dataset.name;
+        const tokenDoc = await getDoc(doc(db, 'admin_tokens', roll));
+        if (!tokenDoc.exists()) return;
+        renderQr('modal-qr-canvas', 'modal-qr-name', 'modal-qr-download', tokenDoc.data().token, name, false);
+        document.getElementById('qr-modal').style.display = 'flex';
+      });
+    });
   }
+
+  document.getElementById('qr-modal-close').addEventListener('click', () => {
+    document.getElementById('qr-modal').style.display = 'none';
+  });
 
   async function loadAttendance() {
     const body = document.getElementById('attendance-body');

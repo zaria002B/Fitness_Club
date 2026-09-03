@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Members are keyed by roll number.
+    // Anyone can read (needed so the check-in page can verify a roll number).
+    // Only a logged-in admin can add, edit, or remove a member.
+    match /members/{rollNumber} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
+    }
+
+    // Attendance is public to insert (that's what makes QR check-in work
+    // without a login) and public to read (so the homepage can show stats).
+    // A check-in is only allowed if the roll number it references
+    // actually exists in members. Only an admin can edit/delete a log.
+    match /attendance/{entryId} {
+      allow read: if true;
+      allow create: if exists(/databases/$(database)/documents/members/$(request.resource.data.member_id));
+      allow update, delete: if request.auth != null;
+    }
+  }
+}

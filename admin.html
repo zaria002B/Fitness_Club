@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Fitness Club</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <div class="mark">COLLEGE <span>FITNESS CLUB</span></div>
+    <div class="nav">
+      <a href="index.html">Home</a>
+      <a href="checkin.html">Check in</a>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN VIEW -->
+<div class="wrap" id="login-view" style="max-width:400px; padding-top:64px;">
+  <h1 class="display" style="font-size:48px; margin:0 0 24px;">ADMIN LOGIN</h1>
+  <form id="login-form">
+    <input type="email" id="login-email" placeholder="Email" required style="margin-bottom:12px;">
+    <input type="password" id="login-password" placeholder="Password" required>
+    <button type="submit" style="width:100%; margin-top:12px;">Log in</button>
+  </form>
+  <div id="login-error" class="msg-err" style="margin-top:16px; font-size:14px;"></div>
+</div>
+
+<!-- DASHBOARD VIEW -->
+<div class="wrap" id="dashboard-view" style="display:none; padding-top:48px; padding-bottom:80px;">
+  <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:32px;">
+    <h1 class="display" style="font-size:48px; margin:0;">DASHBOARD</h1>
+    <button class="btn-outline" id="logout-btn">Log out</button>
+  </div>
+
+  <h2 class="display" style="font-size:24px; margin-bottom:12px;">ADD MEMBER</h2>
+  <form id="add-member-form" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+    <input type="text" id="new-name" placeholder="Full name" required style="flex:2; min-width:180px;">
+    <input type="text" id="new-roll" placeholder="Roll number" required style="flex:1; min-width:140px;">
+    <button type="submit" style="flex:0 0 auto;">Add</button>
+  </form>
+  <div id="add-member-msg" style="margin-bottom:40px; font-size:14px;"></div>
+
+  <h2 class="display" style="font-size:24px; margin-bottom:12px;">ALL MEMBERS</h2>
+  <div class="card" style="padding:0; overflow:hidden; margin-bottom:40px; max-height:320px; overflow-y:auto;">
+    <table>
+      <thead><tr><th>Name</th><th>Roll No.</th></tr></thead>
+      <tbody id="members-body"><tr><td colspan="2" style="color:var(--ink-dim); padding:16px 12px;">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2 class="display" style="font-size:24px; margin-bottom:12px;">ATTENDANCE LOG</h2>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table>
+      <thead><tr><th>Name</th><th>Roll No.</th><th>Time</th></tr></thead>
+      <tbody id="attendance-body"><tr><td colspan="3" style="color:var(--ink-dim); padding:16px 12px;">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script type="module">
+  import { db, auth } from './firebase-config.js';
+  import {
+    signInWithEmailAndPassword, signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+  import {
+    doc, getDoc, setDoc, collection, getDocs, query, orderBy, limit, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  const loginView = document.getElementById('login-view');
+  const dashboardView = document.getElementById('dashboard-view');
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      loginView.style.display = 'none';
+      dashboardView.style.display = 'block';
+      loadMembers();
+      loadAttendance();
+    } else {
+      loginView.style.display = 'block';
+      dashboardView.style.display = 'none';
+    }
+  });
+
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errorEl = document.getElementById('login-error');
+    errorEl.textContent = '';
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      errorEl.textContent = 'Login failed. Check your email and password.';
+    }
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+
+  document.getElementById('add-member-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const full_name = document.getElementById('new-name').value.trim();
+    const roll_number = document.getElementById('new-roll').value.trim();
+    const msg = document.getElementById('add-member-msg');
+
+    try {
+      const memberRef = doc(db, 'members', roll_number);
+      const existing = await getDoc(memberRef);
+      if (existing.exists()) {
+        msg.textContent = 'That roll number is already registered.';
+        msg.className = 'msg-err';
+        return;
+      }
+
+      await setDoc(memberRef, { full_name, roll_number, created_at: serverTimestamp() });
+      msg.textContent = `Added ${full_name}.`;
+      msg.className = 'msg-ok';
+      e.target.reset();
+      loadMembers();
+    } catch (err) {
+      msg.textContent = 'Could not add member. Try again.';
+      msg.className = 'msg-err';
+    }
+  });
+
+  async function loadMembers() {
+    const body = document.getElementById('members-body');
+    const snap = await getDocs(collection(db, 'members'));
+
+    if (snap.empty) {
+      body.innerHTML = '<tr><td colspan="2" style="color:var(--ink-dim); padding:16px 12px;">No members yet.</td></tr>';
+      return;
+    }
+
+    const rows = snap.docs.map(d => d.data()).sort((a, b) => a.full_name.localeCompare(b.full_name));
+    body.innerHTML = rows.map(m => `<tr><td>${m.full_name}</td><td>${m.roll_number}</td></tr>`).join('');
+  }
+
+  async function loadAttendance() {
+    const body = document.getElementById('attendance-body');
+    const q = query(collection(db, 'attendance'), orderBy('checked_in_at', 'desc'), limit(100));
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      body.innerHTML = '<tr><td colspan="3" style="color:var(--ink-dim); padding:16px 12px;">No check-ins yet.</td></tr>';
+      return;
+    }
+
+    body.innerHTML = snap.docs.map(d => {
+      const data = d.data();
+      const time = data.checked_in_at ? data.checked_in_at.toDate().toLocaleString() : '—';
+      return `<tr><td>${data.full_name}</td><td>${data.member_id}</td><td>${time}</td></tr>`;
+    }).join('');
+  }
+</script>
+
+</body>
+</html>

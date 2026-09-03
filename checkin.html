@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Check In — Fitness Club</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <div class="mark">COLLEGE <span>FITNESS CLUB</span></div>
+    <div class="nav">
+      <a href="index.html">Home</a>
+      <a href="admin.html">Admin</a>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" style="max-width:440px; padding-top:64px;">
+  <h1 class="display" style="font-size:56px; margin:0 0 8px;">CHECK IN</h1>
+  <p style="color:var(--ink-dim); margin-bottom:32px;">Enter your roll number to log today's visit.</p>
+
+  <form id="checkin-form">
+    <input type="text" id="roll-input" placeholder="Roll number" autocomplete="off" autofocus required>
+    <button type="submit" style="width:100%; margin-top:12px;">Check in</button>
+  </form>
+
+  <div id="result" style="margin-top:20px; font-size:15px;"></div>
+
+  <p style="color:var(--ink-dim); font-size:13px; margin-top:40px;">
+    Not registered yet? Ask a club admin to add you to the member list.
+  </p>
+</div>
+
+<script type="module">
+  import { db } from './firebase-config.js';
+  import {
+    doc, getDoc, collection, addDoc, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  const form = document.getElementById('checkin-form');
+  const rollInput = document.getElementById('roll-input');
+  const result = document.getElementById('result');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const roll = rollInput.value.trim();
+    if (!roll) return;
+
+    result.textContent = 'Checking…';
+    result.className = '';
+
+    try {
+      // 1. find the member (roll number is the document ID)
+      const memberRef = doc(db, 'members', roll);
+      const memberSnap = await getDoc(memberRef);
+
+      if (!memberSnap.exists()) {
+        result.textContent = "We couldn't find that roll number. Ask an admin to register you first.";
+        result.className = 'msg-err';
+        return;
+      }
+
+      const member = memberSnap.data();
+
+      // 2. log attendance
+      await addDoc(collection(db, 'attendance'), {
+        member_id: roll,
+        full_name: member.full_name,
+        checked_in_at: serverTimestamp()
+      });
+
+      result.textContent = `Checked in, ${member.full_name}. See you at the gym.`;
+      result.className = 'msg-ok';
+      form.reset();
+    } catch (err) {
+      result.textContent = 'Something went wrong logging your check-in. Try again.';
+      result.className = 'msg-err';
+    }
+  });
+</script>
+
+</body>
+</html>

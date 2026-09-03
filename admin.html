@@ -148,7 +148,8 @@
       renderQr('new-qr-canvas', 'new-qr-name', 'new-qr-download', token, full_name, true);
       loadMembers();
     } catch (err) {
-      msg.textContent = 'Could not add member. Try again.';
+      console.error('Add member failed:', err);
+      msg.textContent = `Could not add member: ${err.message || err.code || 'unknown error'}`;
       msg.className = 'msg-err';
     }
   });

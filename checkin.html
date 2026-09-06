@@ -25,7 +25,7 @@
 <script type="module">
   import { db } from './firebase-config.js';
   import {
-    doc, getDoc, collection, addDoc, query, where, getDocs, limit, serverTimestamp, Timestamp
+    doc, getDoc, collection, addDoc, query, where, getDocs, limit, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
   const content = document.getElementById('content');
@@ -89,18 +89,22 @@
       }
       const full_name = memberSnap.data().full_name || fallbackName;
 
-      // Prevent duplicate check-ins on the same day.
+      // Prevent duplicate check-ins on the same day. This only filters by
+      // member_id (no composite index needed) and checks the date in JS.
       const now = new Date();
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const existingQuery = query(
         collection(db, 'attendance'),
         where('member_id', '==', roll),
-        where('checked_in_at', '>=', Timestamp.fromDate(startOfToday)),
-        limit(1)
+        limit(20)
       );
       const existingSnap = await getDocs(existingQuery);
+      const alreadyToday = existingSnap.docs.some(d => {
+        const ts = d.data().checked_in_at;
+        return ts && ts.toDate() >= startOfToday;
+      });
 
-      if (!existingSnap.empty) {
+      if (alreadyToday) {
         renderStatus('ALREADY IN', `You already checked in today, <strong style="color:var(--ink);">${full_name}</strong>.`, 'var(--volt)');
         renderSwitchLink();
         return;
@@ -115,7 +119,8 @@
       renderStatus('CHECKED IN', `Nice work, <strong style="color:var(--ink);">${full_name}</strong>. See you at the gym.`, 'var(--volt)');
       renderSwitchLink();
     } catch (err) {
-      renderStatus('CAN\'T CHECK IN', 'Something went wrong. Try scanning again.', 'var(--alert)');
+      console.error('Check-in failed:', err);
+      renderStatus('CAN\'T CHECK IN', `Something went wrong: ${err.message || err.code || 'unknown error'}`, 'var(--alert)');
     }
   }
 

@@ -18,9 +18,8 @@
   </div>
 </div>
 
-<div class="wrap" style="max-width:440px; padding-top:96px; text-align:center;">
-  <h1 class="display" style="font-size:56px; margin:0 0 24px;" id="status-title">CHECKING IN…</h1>
-  <div id="status-body" style="font-size:16px; color:var(--ink-dim);">Reading your QR code.</div>
+<div class="wrap" style="max-width:440px; padding-top:80px; text-align:center;" id="content">
+  <!-- filled in by script -->
 </div>
 
 <script type="module">
@@ -29,70 +28,105 @@
     doc, getDoc, collection, addDoc, query, where, getDocs, limit, serverTimestamp, Timestamp
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-  const title = document.getElementById('status-title');
-  const body = document.getElementById('status-body');
+  const content = document.getElementById('content');
+  const STORAGE_KEY = 'fitness_club_member_roll';
 
-  function showError(message) {
-    title.textContent = 'CAN\'T CHECK IN';
-    title.style.color = 'var(--alert)';
-    body.innerHTML = message;
+  function renderStatus(titleText, bodyHtml, color) {
+    content.innerHTML = `
+      <h1 class="display" style="font-size:56px; margin:0 0 24px; color:${color};">${titleText}</h1>
+      <div style="font-size:16px; color:var(--ink-dim);">${bodyHtml}</div>
+    `;
   }
 
-  function showSuccess(name, alreadyToday) {
-    title.textContent = alreadyToday ? 'ALREADY IN' : 'CHECKED IN';
-    title.style.color = 'var(--volt)';
-    body.innerHTML = alreadyToday
-      ? `You already checked in today, <strong style="color:var(--ink);">${name}</strong>.`
-      : `Nice work, <strong style="color:var(--ink);">${name}</strong>. See you at the gym.`;
+  function renderSwitchLink() {
+    const el = document.createElement('div');
+    el.style.marginTop = '32px';
+    el.innerHTML = `<a href="#" id="switch-link" style="color:var(--ink-dim); font-size:13px; text-decoration:underline;">Not you? Switch member</a>`;
+    content.appendChild(el);
+    document.getElementById('switch-link').addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.removeItem(STORAGE_KEY);
+      renderSetupForm();
+    });
   }
 
-  async function run() {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+  function renderSetupForm(errorMsg) {
+    content.innerHTML = `
+      <h1 class="display" style="font-size:48px; margin:0 0 8px;">WHO'S CHECKING IN?</h1>
+      <p style="color:var(--ink-dim); margin-bottom:28px;">First time on this phone — enter your roll number once. It'll be remembered here so future scans are instant.</p>
+      <form id="setup-form">
+        <input type="text" id="roll-input" placeholder="Roll number" autocomplete="off" autofocus required>
+        <button type="submit" style="width:100%; margin-top:12px;">Continue</button>
+      </form>
+      <div id="setup-error" class="msg-err" style="margin-top:16px; font-size:14px;">${errorMsg || ''}</div>
+    `;
 
-    if (!token) {
-      showError('This link is missing your personal check-in code. Please scan the QR code the club gave you — don\'t type this address in manually.');
-      return;
-    }
+    document.getElementById('setup-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const roll = document.getElementById('roll-input').value.trim();
+      if (!roll) return;
 
-    try {
-      const tokenSnap = await getDoc(doc(db, 'tokens', token));
-      if (!tokenSnap.exists()) {
-        showError('This QR code isn\'t recognized. Ask a club admin to check your registration.');
+      const memberSnap = await getDoc(doc(db, 'members', roll));
+      if (!memberSnap.exists()) {
+        renderSetupForm('Roll number not found. Ask a club admin to register you first.');
         return;
       }
 
-      const { roll_number, full_name } = tokenSnap.data();
+      localStorage.setItem(STORAGE_KEY, roll);
+      await checkIn(roll, memberSnap.data().full_name);
+    });
+  }
+
+  async function checkIn(roll, fallbackName) {
+    renderStatus('CHECKING IN…', 'One moment.', 'var(--ink)');
+
+    try {
+      const memberSnap = await getDoc(doc(db, 'members', roll));
+      if (!memberSnap.exists()) {
+        localStorage.removeItem(STORAGE_KEY);
+        renderSetupForm('Your saved registration wasn\'t found. Please re-enter your roll number.');
+        return;
+      }
+      const full_name = memberSnap.data().full_name || fallbackName;
 
       // Prevent duplicate check-ins on the same day.
       const now = new Date();
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const existingQuery = query(
         collection(db, 'attendance'),
-        where('member_id', '==', roll_number),
+        where('member_id', '==', roll),
         where('checked_in_at', '>=', Timestamp.fromDate(startOfToday)),
         limit(1)
       );
       const existingSnap = await getDocs(existingQuery);
 
       if (!existingSnap.empty) {
-        showSuccess(full_name, true);
+        renderStatus('ALREADY IN', `You already checked in today, <strong style="color:var(--ink);">${full_name}</strong>.`, 'var(--volt)');
+        renderSwitchLink();
         return;
       }
 
       await addDoc(collection(db, 'attendance'), {
-        member_id: roll_number,
+        member_id: roll,
         full_name: full_name,
         checked_in_at: serverTimestamp()
       });
 
-      showSuccess(full_name, false);
+      renderStatus('CHECKED IN', `Nice work, <strong style="color:var(--ink);">${full_name}</strong>. See you at the gym.`, 'var(--volt)');
+      renderSwitchLink();
     } catch (err) {
-      showError('Something went wrong logging your check-in. Try scanning again.');
+      renderStatus('CAN\'T CHECK IN', 'Something went wrong. Try scanning again.', 'var(--alert)');
     }
   }
 
-  run();
+  // Entry point: if this device already knows who you are, check in
+  // instantly. Otherwise ask once.
+  const savedRoll = localStorage.getItem(STORAGE_KEY);
+  if (savedRoll) {
+    checkIn(savedRoll);
+  } else {
+    renderSetupForm();
+  }
 </script>
 
 </body>

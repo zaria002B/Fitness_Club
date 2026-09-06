@@ -3,29 +3,12 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Members are keyed by roll number. Public info only (name, roll number)
-    // — no secrets live here. Anyone can read (needed for the homepage
-    // count and the admin list). Only a logged-in admin can add/edit/remove.
+    // — no secrets live here. Anyone can read (needed for check-in to
+    // verify a roll number on first-time setup, and for the admin list).
+    // Only a logged-in admin can add/edit/remove.
     match /members/{rollNumber} {
       allow read: if true;
       allow create, update, delete: if request.auth != null;
-    }
-
-    // Each member's personal check-in token. The token itself (the document
-    // ID) is a random, unguessable string — like a QR code's secret.
-    // "get" (fetching one exact token, which is what scanning a QR code
-    // does) is allowed for anyone. "list" (browsing/dumping every token)
-    // is blocked, so tokens can't be discovered — only used if you already
-    // have the exact one from a scanned QR code.
-    match /tokens/{token} {
-      allow get: if true;
-      allow list: if false;
-      allow create, update, delete: if request.auth != null;
-    }
-
-    // Maps a roll number back to its token, so an admin can re-download or
-    // reprint a lost QR code later. Fully private — admin only.
-    match /admin_tokens/{rollNumber} {
-      allow read, write: if request.auth != null;
     }
 
     // Attendance is public to insert (that's what makes QR check-in work

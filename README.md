@@ -21,9 +21,11 @@ first scan asks for a roll number, every scan after that is automatic.
 3. The first time a member's *phone* scans that code, `checkin.html` asks for their roll number once, checks it against the member list, and saves it in that phone's local storage.
 4. Every time after that, scanning the same entrance QR code on that same phone logs their attendance immediately — no typing, no per-member code to carry.
 5. Scanning it twice in the same day shows "already checked in" instead of logging a duplicate.
-6. If someone lends their phone to a friend, there's a **"Not you? Switch member"** link on the check-in page to reset it for a different person.
+6. Once a phone is set up for one member, it **stays** that member — there's no in-page "switch member" button, on purpose. A one-tap switch would let anyone check in as someone else just by tapping a link, defeating the whole point.
 
 **Worth knowing:** this ties a check-in to a specific phone rather than a typed number, which stops casual friend requests like "just type my roll number for me." It doesn't stop someone handing over an unlocked, already-set-up phone — no free system fully solves that, the same as sharing a physical gym card. If it ever becomes a real problem, the next step up is having staff visually check members in instead of full self-serve scanning.
+
+**If a phone was set up wrong** (typo'd roll number, member got a new phone, etc.): the fix is clearing that site's data through the phone's own browser settings (Settings → Site settings → find the site → Clear data), not a button on the page. That's deliberately more friction than a tap, so it can't be used casually to check in for other people, but it's still recoverable when genuinely needed.
 
 ---
 

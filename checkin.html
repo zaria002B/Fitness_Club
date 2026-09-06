@@ -38,18 +38,6 @@
     `;
   }
 
-  function renderSwitchLink() {
-    const el = document.createElement('div');
-    el.style.marginTop = '32px';
-    el.innerHTML = `<a href="#" id="switch-link" style="color:var(--ink-dim); font-size:13px; text-decoration:underline;">Not you? Switch member</a>`;
-    content.appendChild(el);
-    document.getElementById('switch-link').addEventListener('click', (e) => {
-      e.preventDefault();
-      localStorage.removeItem(STORAGE_KEY);
-      renderSetupForm();
-    });
-  }
-
   function renderSetupForm(errorMsg) {
     content.innerHTML = `
       <h1 class="display" style="font-size:48px; margin:0 0 8px;">WHO'S CHECKING IN?</h1>
@@ -106,7 +94,6 @@
 
       if (alreadyToday) {
         renderStatus('ALREADY IN', `You already checked in today, <strong style="color:var(--ink);">${full_name}</strong>.`, 'var(--volt)');
-        renderSwitchLink();
         return;
       }
 
@@ -117,7 +104,6 @@
       });
 
       renderStatus('CHECKED IN', `Nice work, <strong style="color:var(--ink);">${full_name}</strong>. See you at the gym.`, 'var(--volt)');
-      renderSwitchLink();
     } catch (err) {
       console.error('Check-in failed:', err);
       renderStatus('CAN\'T CHECK IN', `Something went wrong: ${err.message || err.code || 'unknown error'}`, 'var(--alert)');

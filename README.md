@@ -4,77 +4,94 @@ A free, no-domain-needed website for tracking gym attendance. One QR code,
 printed once and stuck at the door. Every member scans the *same* code —
 first scan asks for a roll number, every scan after that is automatic.
 
-- `index.html` — public homepage with live stats
+- `index.html` — public homepage with live stats and **today's** check-ins
 - `checkin.html` — the page the entrance QR code links to
-- `admin.html` — password-protected dashboard: add members, download the entrance QR, view logs
+- `admin.html` — password-protected dashboard: add/delete members, manage admins, view per-member calendars, view logs
 - `firebase-config.js` — where you paste your Firebase project keys
 - `firestore.rules` — database security rules
-- `qrcode.min.js` — the QR-generation library, bundled locally so no ad-blocker can interfere with it
+- `qrcode.min.js` — the QR-generation library, bundled locally
 - `style.css` — shared design
 
 ---
 
-## How check-in works
+## What's new in this version
 
-1. An admin adds each member by name + roll number in `admin.html`.
-2. The admin downloads **one QR code** from the dashboard (it just links to `checkin.html`) and prints it at the gym entrance.
-3. The first time a member's *phone* scans that code, `checkin.html` asks for their roll number once, checks it against the member list, and saves it in that phone's local storage.
-4. Every time after that, scanning the same entrance QR code on that same phone logs their attendance immediately — no typing, no per-member code to carry.
-5. Scanning it twice in the same day shows "already checked in" instead of logging a duplicate.
-6. Once a phone is set up for one member, it **stays** that member — there's no in-page "switch member" button, on purpose. A one-tap switch would let anyone check in as someone else just by tapping a link, defeating the whole point.
+1. **Multiple admins.** Any admin can add another admin from the dashboard.
+2. **Delete members.** Each member row has a Delete button. Their past attendance stays on record, but they can no longer check in.
+3. **Daily-reset homepage feed.** "Today's check-ins" on the homepage only ever shows today — it clears itself automatically at midnight (nothing to manually reset).
+4. **Per-member calendar.** Click "History" next to any member to see a month calendar with every day they checked in highlighted, with month navigation.
+5. **Check-in counts.** The members table shows a running "Days In" total for every member.
 
-**Worth knowing:** this ties a check-in to a specific phone rather than a typed number, which stops casual friend requests like "just type my roll number for me." It doesn't stop someone handing over an unlocked, already-set-up phone — no free system fully solves that, the same as sharing a physical gym card. If it ever becomes a real problem, the next step up is having staff visually check members in instead of full self-serve scanning.
+### Important: admin security was tightened
 
-**If a phone was set up wrong** (typo'd roll number, member got a new phone, etc.): the fix is clearing that site's data through the phone's own browser settings (Settings → Site settings → find the site → Clear data), not a button on the page. That's deliberately more friction than a tap, so it can't be used casually to check in for other people, but it's still recoverable when genuinely needed.
+Previously, *any* Firebase account could act as an admin — which is a problem, because Firebase account sign-up is open to the public by default. A technically-minded visitor could have created their own account from the browser console and gotten full admin access without ever touching your dashboard.
+
+This version fixes that with a proper **admins list** in the database: an account only counts as an admin if its ID is explicitly added to that list — either by you (the very first time, done by hand — see below) or by an existing admin using the new "Add Admin" form.
+
+**This means you must re-publish `firestore.rules` and do one manual one-time step to register your first admin**, even if you've already set this project up before.
 
 ---
 
-## 1. Create your database (Firebase)
+## 1. Create your database (Firebase) — first time only
 
-1. [console.firebase.google.com](https://console.firebase.google.com) → **Add project** → name it → **Create project**.
+1. [console.firebase.google.com](https://console.firebase.google.com) → **Add project** → **Create project**.
 2. **Build → Firestore Database** → **Create database** → nearby location → **production mode**.
 3. **Rules** tab → replace everything with the contents of `firestore.rules` → **Publish**.
 4. **Build → Authentication** → **Get started** → enable **Email/Password**.
-5. **Authentication → Users** → **Add user** → this is your admin login.
+5. **Authentication → Users** → **Add user** → note the email you use.
 
-## 2. Get your web app config
+## 2. Register your first admin (manual, one time)
+
+This is the step that used to be implicit and now has to be done explicitly:
+
+1. In Firebase Console, go to **Authentication → Users**. Find the user you just created and copy their **User UID** (a long string of letters/numbers).
+2. Go to **Firestore Database → Data** tab → **Start collection** → collection ID: `admins`.
+3. For the **Document ID**, paste in that exact User UID (don't let it auto-generate one).
+4. Add one field: `email` (type: string) → your admin email address.
+5. Save.
+
+Now that account can log into `admin.html` — and from there, can add further admins through the dashboard without ever touching Firebase Console again.
+
+## 3. Get your web app config
 
 Gear icon → **Project settings** → **Your apps** → **</>** to register a web app → copy the `firebaseConfig` values into `firebase-config.js`.
 
-## 3. Push to GitHub, deploy on Vercel
+## 4. Push to GitHub, deploy on Vercel
 
 1. Create a GitHub repo, upload **all** the files including `qrcode.min.js`.
 2. On [vercel.com](https://vercel.com), import the repo, leave settings default, **Deploy**.
 3. Copy your live link.
 4. Firebase → **Authentication → Settings → Authorized domains → Add domain** → paste your Vercel domain.
 
-## 4. Print your one QR code
+## 5. Print your one QR code
 
-1. Go to `your-link.vercel.app/admin.html`, log in.
-2. Under **Gym Entrance QR Code**, click **Download QR**.
-3. Print it, laminate it if you can, and stick it up at the gym entrance. This is the only QR code you'll ever need — you don't regenerate it per member.
+Log into `admin.html` → **Gym Entrance QR Code** → **Download QR** → print it, stick it at the gym entrance. You never need to regenerate this.
 
-## 5. Add your members
+## 6. Add members
 
-Under **Add Member**, enter each person's name + roll number. No QR code is generated per member anymore — they'll register themselves automatically the first time they scan the entrance code.
+Under **Add Member**, enter each person's name + roll number.
 
-## 6. Test it
+## 7. Add more admins (optional, any time)
 
-1. Scan the printed (or on-screen) entrance QR with your own phone.
-2. It should ask for your roll number once — enter one you registered in step 5.
-3. It checks you in immediately and remembers you.
-4. Scan the same QR code again — it should check you in instantly with no form this time.
-5. Scan it a third time same day — it should say "already checked in."
-6. Check the homepage — stats and recent check-ins update.
+Under **Add Admin**, enter their email and a temporary password, then share that password with them directly (e.g. in person or a private message) so they can log in and change it themselves if they want. Anyone you add here gets full dashboard access — treat it like handing over a set of keys.
+
+## 8. Test it
+
+1. Scan the entrance QR with your phone → enter a roll number once → it checks you in and remembers you.
+2. Scan again → instant check-in, no form.
+3. Homepage → today's check-in should appear under "Today's check-ins," and the stat counts update.
+4. In admin.html, click **History** next to that member → today's date should be highlighted on the calendar, and "Days In" should show 1.
+5. Try **Delete** on a test member → confirm they disappear from the list and can no longer check in (their old calendar/attendance data is untouched).
 
 ---
 
 ### How the security actually works
 
-- `members/{rollNumber}` — public name + roll number, no secrets. Anyone can read (needed to verify a roll number during first-time setup), only a logged-in admin can add/edit/delete.
+- `admins/{uid}` — the authoritative list of who's an admin. Only existing admins can read or write it.
+- `members/{rollNumber}` — public name + roll number, no secrets. Anyone can read (needed to verify a roll number during first-time check-in setup), only an admin can add/edit/delete.
 - `attendance` — public to insert (so check-in works without login) and public to read (so the homepage can show stats). Only an admin can edit/delete a log entry.
-- The actual anti-fraud layer lives in the browser, not the database: each phone remembers its own member identity in `localStorage`, so the *same* entrance QR code behaves differently depending on whose phone scans it.
+- Check-in fraud protection lives in the browser: each phone remembers its own member identity in `localStorage`, with no in-page way to switch to a different member (that has to go through the phone's own browser settings — see `checkin.html`'s behavior).
 
 ### Free tier notes
 
-Firebase's free "Spark" plan comfortably covers a college club's traffic and this app's usage.
+Firebase's free "Spark" plan comfortably covers a college club's traffic and this app's usage, including the extra per-member count queries on the admin dashboard.

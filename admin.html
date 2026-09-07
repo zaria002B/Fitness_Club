@@ -20,6 +20,16 @@
     color: #0C0D0F;
     font-weight: 700;
   }
+  .heat-cell {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
+  .heat-0 { background: var(--surface-2); }
+  .heat-1 { background: #3d4a1f; }
+  .heat-2 { background: #5a7228; }
+  .heat-3 { background: #86a52e; }
+  .heat-4 { background: var(--volt); }
 </style>
 </head>
 <body>
@@ -88,12 +98,31 @@
   </form>
   <div id="add-admin-msg" style="margin-bottom:40px; font-size:14px;"></div>
 
-  <h2 class="display" style="font-size:24px; margin-bottom:12px;">ATTENDANCE LOG</h2>
-  <div class="card" style="padding:0; overflow:hidden;">
-    <table>
-      <thead><tr><th>Name</th><th>Roll No.</th><th>Time</th></tr></thead>
-      <tbody id="attendance-body"><tr><td colspan="3" style="color:var(--ink-dim); padding:16px 12px;">Loading…</td></tr></tbody>
-    </table>
+  <h2 class="display" style="font-size:24px; margin-bottom:4px;">GYM ACTIVITY</h2>
+  <p style="color:var(--ink-dim); font-size:13px; margin:0 0 16px;">Total check-ins per day across all members, last 12 months. Click a member's History above for their individual record.</p>
+  <div class="card" style="overflow-x:auto;">
+    <div id="heatmap-months" style="display:flex; gap:3px; margin-left:24px; margin-bottom:4px;"></div>
+    <div style="display:flex; gap:3px;">
+      <div style="display:flex; flex-direction:column; gap:3px; font-size:10px; color:var(--ink-dim); margin-right:4px; width:20px;">
+        <div style="height:12px;"></div>
+        <div style="height:12px;">Mon</div>
+        <div style="height:12px;"></div>
+        <div style="height:12px;">Wed</div>
+        <div style="height:12px;"></div>
+        <div style="height:12px;">Fri</div>
+        <div style="height:12px;"></div>
+      </div>
+      <div id="heatmap-grid" style="display:flex; gap:3px;"></div>
+    </div>
+    <div style="display:flex; align-items:center; gap:6px; margin-top:16px; font-size:11px; color:var(--ink-dim);">
+      <span>Less</span>
+      <div class="heat-cell heat-0"></div>
+      <div class="heat-cell heat-1"></div>
+      <div class="heat-cell heat-2"></div>
+      <div class="heat-cell heat-3"></div>
+      <div class="heat-cell heat-4"></div>
+      <span>More</span>
+    </div>
   </div>
 </div>
 
@@ -122,7 +151,7 @@
     getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
   import {
-    doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where, orderBy, limit, serverTimestamp, getCountFromServer
+    doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where, serverTimestamp, getCountFromServer
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
   const loginView = document.getElementById('login-view');
@@ -150,7 +179,7 @@
     dashboardView.style.display = 'block';
     renderEntranceQr();
     loadMembers();
-    loadAttendance();
+    loadHeatmap();
   });
 
   document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -357,22 +386,75 @@
     }
   });
 
-  // ---------- Full attendance log ----------
-  async function loadAttendance() {
-    const body = document.getElementById('attendance-body');
-    const q = query(collection(db, 'attendance'), orderBy('checked_in_at', 'desc'), limit(100));
-    const snap = await getDocs(q);
+  // ---------- Gym-wide activity heatmap ----------
+  async function loadHeatmap() {
+    const grid = document.getElementById('heatmap-grid');
+    const monthsRow = document.getElementById('heatmap-months');
+    grid.innerHTML = '';
+    monthsRow.innerHTML = '';
 
-    if (snap.empty) {
-      body.innerHTML = '<tr><td colspan="3" style="color:var(--ink-dim); padding:16px 12px;">No check-ins yet.</td></tr>';
-      return;
+    const snap = await getDocs(collection(db, 'attendance'));
+    const counts = {};
+    snap.docs.forEach(d => {
+      const ts = d.data().checked_in_at;
+      if (!ts) return;
+      const dt = ts.toDate();
+      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setDate(start.getDate() - 364);
+    start.setDate(start.getDate() - start.getDay()); // back up to the Sunday on/before start
+
+    function levelFor(count) {
+      if (!count) return 0;
+      if (count <= 2) return 1;
+      if (count <= 5) return 2;
+      if (count <= 9) return 3;
+      return 4;
     }
 
-    body.innerHTML = snap.docs.map(d => {
-      const data = d.data();
-      const time = data.checked_in_at ? data.checked_in_at.toDate().toLocaleString() : '—';
-      return `<tr><td>${data.full_name}</td><td>${data.member_id}</td><td>${time}</td></tr>`;
-    }).join('');
+    let cursor = new Date(start);
+    let lastMonth = -1;
+
+    while (cursor <= today) {
+      const weekCol = document.createElement('div');
+      weekCol.style.display = 'flex';
+      weekCol.style.flexDirection = 'column';
+      weekCol.style.gap = '3px';
+
+      const monthLabel = document.createElement('div');
+      monthLabel.style.fontSize = '10px';
+      monthLabel.style.color = 'var(--ink-dim)';
+      monthLabel.style.height = '12px';
+      monthLabel.style.whiteSpace = 'nowrap';
+      if (cursor.getMonth() !== lastMonth) {
+        monthLabel.textContent = cursor.toLocaleString('default', { month: 'short' });
+        lastMonth = cursor.getMonth();
+      }
+      monthsRow.appendChild(monthLabel);
+
+      for (let i = 0; i < 7; i++) {
+        const cellDate = new Date(cursor);
+        const cell = document.createElement('div');
+        cell.className = 'heat-cell';
+        if (cellDate > today) {
+          cell.style.background = 'transparent';
+        } else {
+          const key = `${cellDate.getFullYear()}-${String(cellDate.getMonth() + 1).padStart(2, '0')}-${String(cellDate.getDate()).padStart(2, '0')}`;
+          const count = counts[key] || 0;
+          cell.classList.add(`heat-${levelFor(count)}`);
+          cell.title = `${cellDate.toDateString()}: ${count} check-in${count === 1 ? '' : 's'}`;
+        }
+        weekCol.appendChild(cell);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      grid.appendChild(weekCol);
+    }
   }
 </script>
 

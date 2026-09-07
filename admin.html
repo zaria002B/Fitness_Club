@@ -257,13 +257,30 @@
       return;
     }
 
-    const members = snap.docs.map(d => d.data()).sort((a, b) => a.full_name.localeCompare(b.full_name));
+    const members = snap.docs.map(d => d.data());
 
-    body.innerHTML = members.map((m, i) => `
+    // Fetch each member's check-in count first, so the table can be sorted
+    // by it (highest attendance at the top).
+    const membersWithCounts = await Promise.all(members.map(async (m) => {
+      let count = 0;
+      try {
+        const countSnap = await getCountFromServer(
+          query(collection(db, 'attendance'), where('member_id', '==', m.roll_number))
+        );
+        count = countSnap.data().count;
+      } catch (err) {
+        count = 0;
+      }
+      return { ...m, count };
+    }));
+
+    membersWithCounts.sort((a, b) => b.count - a.count || a.full_name.localeCompare(b.full_name));
+
+    body.innerHTML = membersWithCounts.map((m, i) => `
       <tr>
         <td>${m.full_name}</td>
         <td>${m.roll_number}</td>
-        <td id="days-count-${i}">…</td>
+        <td>${m.count}</td>
         <td style="white-space:nowrap;">
           <button class="btn-outline history-btn" data-index="${i}" style="padding:6px 10px; font-size:13px; margin-right:6px;">History</button>
           <button class="btn-outline delete-btn" data-index="${i}" style="padding:6px 10px; font-size:13px; color:var(--alert); border-color:var(--alert);">Delete</button>
@@ -271,26 +288,13 @@
       </tr>
     `).join('');
 
-    members.forEach(async (m, i) => {
-      try {
-        const countSnap = await getCountFromServer(
-          query(collection(db, 'attendance'), where('member_id', '==', m.roll_number))
-        );
-        const cell = document.getElementById(`days-count-${i}`);
-        if (cell) cell.textContent = countSnap.data().count;
-      } catch (err) {
-        const cell = document.getElementById(`days-count-${i}`);
-        if (cell) cell.textContent = '—';
-      }
-    });
-
     document.querySelectorAll('.history-btn').forEach(btn => {
       const i = Number(btn.dataset.index);
-      btn.addEventListener('click', () => openHistory(members[i].roll_number, members[i].full_name));
+      btn.addEventListener('click', () => openHistory(membersWithCounts[i].roll_number, membersWithCounts[i].full_name));
     });
     document.querySelectorAll('.delete-btn').forEach(btn => {
       const i = Number(btn.dataset.index);
-      btn.addEventListener('click', () => deleteMember(members[i].roll_number));
+      btn.addEventListener('click', () => deleteMember(membersWithCounts[i].roll_number));
     });
   }
 

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Progress — Fitness Club</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .heat-cell { width: 12px; height: 12px; border-radius: 2px; }
+  .heat-0 { background: var(--surface-2); }
+  .heat-1 { background: #3d4a1f; }
+  .heat-2 { background: #5a7228; }
+  .heat-3 { background: #86a52e; }
+  .heat-4 { background: var(--volt); }
+  .bar-col { display:flex; flex-direction:column; align-items:center; gap:6px; flex:1; }
+  .bar { width:60%; background:var(--volt); border-radius:3px 3px 0 0; min-height:2px; }
+  .bar-track { display:flex; align-items:flex-end; height:120px; width:100%; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <div class="mark">COLLEGE <span>FITNESS CLUB</span></div>
+    <div class="nav">
+      <a href="index.html">Home</a>
+      <a href="checkin.html">Check in</a>
+      <a href="admin.html">Admin</a>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" style="padding-top:64px; padding-bottom:80px;" id="content">
+  <!-- filled in by script -->
+</div>
+
+<script type="module">
+  import { db } from './firebase-config.js';
+  import { doc, getDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  const content = document.getElementById('content');
+  const STORAGE_KEY = 'fitness_club_member_roll';
+
+  function dateKey(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function computeStreak(datesSet) {
+    let streak = 0;
+    let cursor = new Date();
+    cursor.setHours(0, 0, 0, 0);
+    if (!datesSet.has(dateKey(cursor))) {
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    while (datesSet.has(dateKey(cursor))) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
+  }
+
+  function computeThisWeek(datesSet) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setDate(start.getDate() - start.getDay());
+    let count = 0;
+    for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+      if (datesSet.has(dateKey(d))) count++;
+    }
+    return count;
+  }
+
+  function renderNotRegistered() {
+    content.innerHTML = `
+      <div style="max-width:440px; text-align:center; margin:0 auto;">
+        <h1 class="display" style="font-size:48px; margin:0 0 16px;">NO PROGRESS YET</h1>
+        <p style="color:var(--ink-dim); font-size:16px; margin-bottom:24px;">
+          This phone hasn't checked in before. Scan the entrance QR code at the gym once, and your progress will show up here from then on.
+        </p>
+        <a href="checkin.html" class="btn-outline" style="display:inline-block; text-decoration:none; padding:12px 24px;">Go to check-in</a>
+      </div>
+    `;
+  }
+
+  function renderWeeklyBars(datesSet) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weeks = [];
+    for (let i = 7; i >= 0; i--) {
+      const weekStart = new Date(today);
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay() - i * 7);
+      let count = 0;
+      for (let d = new Date(weekStart); d < new Date(weekStart.getTime() + 7 * 86400000) && d <= today; d.setDate(d.getDate() + 1)) {
+        if (datesSet.has(dateKey(d))) count++;
+      }
+      weeks.push({ label: i === 0 ? 'This wk' : weekStart.toLocaleDateString('default', { month: 'short', day: 'numeric' }), count });
+    }
+    const max = Math.max(1, ...weeks.map(w => w.count));
+
+    return `
+      <div class="card">
+        <div class="bar-track" style="gap:8px;">
+          ${weeks.map(w => `
+            <div class="bar-col">
+              <div style="font-size:11px; color:var(--ink-dim);">${w.count}</div>
+              <div class="bar" style="height:${(w.count / max) * 100}px;"></div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          ${weeks.map(w => `<div style="flex:1; text-align:center; font-size:10px; color:var(--ink-dim);">${w.label}</div>`).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderHeatmap(datesSet) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setDate(start.getDate() - 364);
+    start.setDate(start.getDate() - start.getDay());
+
+    function levelFor(has) { return has ? 4 : 0; }
+
+    let cursor = new Date(start);
+    let lastMonth = -1;
+    let monthsHtml = '';
+    let colsHtml = '';
+
+    while (cursor <= today) {
+      let cellsHtml = '';
+      const monthLabel = cursor.getMonth() !== lastMonth ? cursor.toLocaleString('default', { month: 'short' }) : '';
+      if (cursor.getMonth() !== lastMonth) lastMonth = cursor.getMonth();
+      monthsHtml += `<div style="font-size:10px; color:var(--ink-dim); height:12px; white-space:nowrap;">${monthLabel}</div>`;
+
+      for (let i = 0; i < 7; i++) {
+        const cellDate = new Date(cursor);
+        if (cellDate > today) {
+          cellsHtml += `<div class="heat-cell" style="background:transparent;"></div>`;
+        } else {
+          const has = datesSet.has(dateKey(cellDate));
+          cellsHtml += `<div class="heat-cell heat-${levelFor(has)}" title="${cellDate.toDateString()}${has ? ' — checked in' : ''}"></div>`;
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      colsHtml += `<div style="display:flex; flex-direction:column; gap:3px;">${cellsHtml}</div>`;
+    }
+
+    return `
+      <div class="card" style="overflow-x:auto;">
+        <div style="display:flex; gap:3px; margin-left:24px; margin-bottom:4px;">${monthsHtml}</div>
+        <div style="display:flex; gap:3px;">
+          <div style="display:flex; flex-direction:column; gap:3px; font-size:10px; color:var(--ink-dim); margin-right:4px; width:20px;">
+            <div style="height:12px;"></div><div style="height:12px;">Mon</div><div style="height:12px;"></div>
+            <div style="height:12px;">Wed</div><div style="height:12px;"></div><div style="height:12px;">Fri</div><div style="height:12px;"></div>
+          </div>
+          <div style="display:flex; gap:3px;">${colsHtml}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function run() {
+    const roll = localStorage.getItem(STORAGE_KEY);
+    if (!roll) {
+      renderNotRegistered();
+      return;
+    }
+
+    const memberSnap = await getDoc(doc(db, 'members', roll));
+    if (!memberSnap.exists()) {
+      renderNotRegistered();
+      return;
+    }
+    const { full_name } = memberSnap.data();
+
+    const attSnap = await getDocs(query(collection(db, 'attendance'), where('member_id', '==', roll)));
+    const datesSet = new Set();
+    attSnap.docs.forEach(d => {
+      const ts = d.data().checked_in_at;
+      if (ts) datesSet.add(dateKey(ts.toDate()));
+    });
+
+    const total = datesSet.size;
+    const streak = computeStreak(datesSet);
+    const thisWeek = computeThisWeek(datesSet);
+
+    content.innerHTML = `
+      <h1 class="display" style="font-size:56px; margin:0 0 4px;">MY PROGRESS</h1>
+      <p style="color:var(--ink-dim); font-size:16px; margin-bottom:32px;">${full_name} · Roll ${roll}</p>
+
+      <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:32px;">
+        <div class="card" style="flex:1; min-width:140px;">
+          <div class="stat-num">${total}</div>
+          <div class="stat-label">TOTAL CHECK-INS</div>
+        </div>
+        <div class="card" style="flex:1; min-width:140px;">
+          <div class="stat-num">${streak}</div>
+          <div class="stat-label">CURRENT STREAK (DAYS)</div>
+        </div>
+        <div class="card" style="flex:1; min-width:140px;">
+          <div class="stat-num">${thisWeek}</div>
+          <div class="stat-label">THIS WEEK</div>
+        </div>
+      </div>
+
+      <h2 class="display" style="font-size:24px; margin-bottom:12px;">LAST 8 WEEKS</h2>
+      <div style="margin-bottom:32px;">${renderWeeklyBars(datesSet)}</div>
+
+      <h2 class="display" style="font-size:24px; margin-bottom:12px;">FULL YEAR</h2>
+      ${renderHeatmap(datesSet)}
+    `;
+  }
+
+  run();
+</script>
+
+</body>
+</html>

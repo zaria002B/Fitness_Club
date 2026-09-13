@@ -13,6 +13,7 @@
     <div class="mark">COLLEGE <span>FITNESS CLUB</span></div>
     <div class="nav">
       <a href="index.html">Home</a>
+      <a href="my-progress.html">My Progress</a>
       <a href="admin.html">Admin</a>
     </div>
   </div>
@@ -25,7 +26,7 @@
 <script type="module">
   import { db } from './firebase-config.js';
   import {
-    doc, getDoc, collection, addDoc, query, where, getDocs, limit, serverTimestamp
+    doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, limit, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
   const content = document.getElementById('content');
@@ -41,9 +42,10 @@
   function renderSetupForm(errorMsg) {
     content.innerHTML = `
       <h1 class="display" style="font-size:48px; margin:0 0 8px;">WHO'S CHECKING IN?</h1>
-      <p style="color:var(--ink-dim); margin-bottom:28px;">First time on this phone — enter your roll number once. It'll be remembered here so future scans are instant.</p>
+      <p style="color:var(--ink-dim); margin-bottom:28px;">First time on this phone. Already registered? Just enter your roll number. New here? Add your name too — you'll only ever need to do this once.</p>
       <form id="setup-form">
-        <input type="text" id="roll-input" placeholder="Roll number" autocomplete="off" autofocus required>
+        <input type="text" id="name-input" placeholder="Full name (only needed if you're new)" autocomplete="off" style="margin-bottom:12px;">
+        <input type="text" id="roll-input" placeholder="Roll number" autocomplete="off" required autofocus>
         <button type="submit" style="width:100%; margin-top:12px;">Continue</button>
       </form>
       <div id="setup-error" class="msg-err" style="margin-top:16px; font-size:14px;">${errorMsg || ''}</div>
@@ -52,16 +54,34 @@
     document.getElementById('setup-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const roll = document.getElementById('roll-input').value.trim();
+      const typedName = document.getElementById('name-input').value.trim();
       if (!roll) return;
 
-      const memberSnap = await getDoc(doc(db, 'members', roll));
-      if (!memberSnap.exists()) {
-        renderSetupForm('Roll number not found. Ask a club admin to register you first.');
-        return;
-      }
+      try {
+        const memberRef = doc(db, 'members', roll);
+        const memberSnap = await getDoc(memberRef);
 
-      localStorage.setItem(STORAGE_KEY, roll);
-      await checkIn(roll, memberSnap.data().full_name);
+        if (memberSnap.exists()) {
+          // Already registered — just remember this device and check in.
+          localStorage.setItem(STORAGE_KEY, roll);
+          await checkIn(roll, memberSnap.data().full_name);
+          return;
+        }
+
+        if (!typedName) {
+          renderSetupForm('That roll number isn\'t registered yet. Enter your name above too to register it.');
+          return;
+        }
+
+        // Self-register a brand new roll number. Firestore rules only
+        // allow this when the roll number isn't already taken.
+        await setDoc(memberRef, { full_name: typedName, roll_number: roll, created_at: serverTimestamp() });
+        localStorage.setItem(STORAGE_KEY, roll);
+        await checkIn(roll, typedName);
+      } catch (err) {
+        console.error('Setup failed:', err);
+        renderSetupForm(`Something went wrong: ${err.message || err.code || 'unknown error'}`);
+      }
     });
   }
 

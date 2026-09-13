@@ -19,8 +19,11 @@ first scan asks for a roll number, every scan after that is automatic.
 1. **Multiple admins.** Any admin can add another admin from the dashboard.
 2. **Delete members.** Each member row has a Delete button. Their past attendance stays on record, but they can no longer check in.
 3. **Daily-reset homepage feed.** "Today's check-ins" on the homepage only ever shows today — it clears itself automatically at midnight (nothing to manually reset).
-4. **Per-member calendar.** Click "History" next to any member to see a month calendar with every day they checked in highlighted, with month navigation.
-5. **Check-in counts.** The members table shows a running "Days In" total for every member.
+4. **Per-member calendar (admin view).** Click "History" next to any member to see a month calendar with every day they checked in highlighted, with month navigation.
+5. **Check-in counts, sorted.** The members table shows a running "Days In" total for every member, sorted highest attendance to lowest.
+6. **Gym-wide activity heatmap.** The admin dashboard's old raw log table is now a GitHub-style contribution heatmap — darker/brighter green squares mean more people checked in that day, hover any square for the exact count.
+7. **My Progress page (member-facing).** `my-progress.html` — any member can see their own total check-ins, current streak, this week's count, a weekly bar chart, and their own personal year-long heatmap. It recognizes them the same way check-in does: whichever phone already checked in before is remembered automatically.
+8. **Self-registration on first scan.** A member no longer has to be pre-added by an admin. The first time someone scans the entrance QR on their phone, if their roll number isn't registered yet, they just add their name right there and it registers automatically — practical once you've got 50+ members. Admins can still use **Add Member** to pre-register people if they want to (e.g. reserving official roll numbers ahead of time), but it's optional now.
 
 ### Important: admin security was tightened
 
@@ -88,7 +91,7 @@ Under **Add Admin**, enter their email and a temporary password, then share that
 ### How the security actually works
 
 - `admins/{uid}` — the authoritative list of who's an admin. Only existing admins can read or write it.
-- `members/{rollNumber}` — public name + roll number, no secrets. Anyone can read (needed to verify a roll number during first-time check-in setup), only an admin can add/edit/delete.
+- `members/{rollNumber}` — public name + roll number, no secrets. Anyone can read. Anyone can also *create* a member document, but only for a roll number that doesn't already exist — this is what lets self-registration work on first check-in, while still preventing anyone from overwriting an existing member's name. Only an admin can edit or delete an existing member.
 - `attendance` — public to insert (so check-in works without login) and public to read (so the homepage can show stats). Only an admin can edit/delete a log entry.
 - Check-in fraud protection lives in the browser: each phone remembers its own member identity in `localStorage`, with no in-page way to switch to a different member (that has to go through the phone's own browser settings — see `checkin.html`'s behavior).
 

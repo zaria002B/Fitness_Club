@@ -32,10 +32,65 @@
   const content = document.getElementById('content');
   const STORAGE_KEY = 'fitness_club_member_roll';
 
+  // Original lines written for this app — not quoting any real person, so
+  // there's no copyright issue reproducing them. One is picked based on
+  // the date, so everyone sees the same "quote of the day" and it changes
+  // automatically at midnight — no API, no daily upkeep.
+  const QUOTES = [
+    "Showing up is the hard part. You just did it.",
+    "Discipline is just a promise you keep to yourself.",
+    "Small reps, repeated, become a different body.",
+    "Nobody regrets the workout they finished.",
+    "Consistency beats intensity, every single time.",
+    "You didn't come this far to only come this far.",
+    "The gym doesn't care how you feel. Show up anyway.",
+    "Progress is boring day to day and obvious year to year.",
+    "Today's effort is tomorrow's strength.",
+    "You're not too tired. You're one set away from feeling better.",
+    "Every rep is a vote for the person you're becoming.",
+    "Motivation gets you here. Habit keeps you here.",
+    "The hardest part was walking through the door. Done.",
+    "Strong isn't a look — it's a habit you're building.",
+    "You beat the version of you that stayed home.",
+    "Nobody's watching. Do it for the quiet win.",
+    "Some days you go for a PR. Today, you just went.",
+    "Your future self is grateful you didn't skip today.",
+    "Effort compounds. So does avoiding it.",
+    "This is the part where most people quit. You didn't.",
+    "You don't need to feel ready. You just need to start.",
+    "One more rep than yesterday is still progress.",
+    "The body achieves what the mind believes it can repeat.",
+    "You're building evidence that you keep your promises.",
+    "Bad days at the gym still beat good days on the couch.",
+    "The work you do when no one's counting is the work that counts.",
+    "Discomfort today, capability tomorrow.",
+    "You showed up. That's the whole game.",
+    "Streaks aren't built in a day, but they're broken in one you skip.",
+    "Strength is just discomfort you've done before.",
+  ];
+
+  function getTodaysQuote() {
+    const start = new Date(new Date().getFullYear(), 0, 0);
+    const diff = Date.now() - start.getTime();
+    const dayOfYear = Math.floor(diff / 86400000);
+    return QUOTES[dayOfYear % QUOTES.length];
+  }
+
   function renderStatus(titleText, bodyHtml, color) {
     content.innerHTML = `
       <h1 class="display" style="font-size:56px; margin:0 0 24px; color:${color};">${titleText}</h1>
       <div style="font-size:16px; color:var(--ink-dim);">${bodyHtml}</div>
+    `;
+  }
+
+  function renderStatusWithQuote(titleText, bodyHtml, color) {
+    content.innerHTML = `
+      <h1 class="display" style="font-size:56px; margin:0 0 24px; color:${color};">${titleText}</h1>
+      <div style="font-size:16px; color:var(--ink-dim); margin-bottom:32px;">${bodyHtml}</div>
+      <div class="card" style="text-align:left;">
+        <div style="font-size:11px; letter-spacing:0.06em; color:var(--volt); margin-bottom:8px;">QUOTE OF THE DAY</div>
+        <div style="font-size:16px; line-height:1.5;">"${getTodaysQuote()}"</div>
+      </div>
     `;
   }
 
@@ -113,7 +168,7 @@
       });
 
       if (alreadyToday) {
-        renderStatus('ALREADY IN', `You already checked in today, <strong style="color:var(--ink);">${full_name}</strong>.`, 'var(--volt)');
+        renderStatusWithQuote('ALREADY IN', `You already checked in today, <strong style="color:var(--ink);">${full_name}</strong>.`, 'var(--volt)');
         return;
       }
 
@@ -123,7 +178,7 @@
         checked_in_at: serverTimestamp()
       });
 
-      renderStatus('CHECKED IN', `Nice work, <strong style="color:var(--ink);">${full_name}</strong>. See you at the gym.`, 'var(--volt)');
+      renderStatusWithQuote('CHECKED IN', `Nice work, <strong style="color:var(--ink);">${full_name}</strong>. See you at the gym.`, 'var(--volt)');
     } catch (err) {
       console.error('Check-in failed:', err);
       renderStatus('CAN\'T CHECK IN', `Something went wrong: ${err.message || err.code || 'unknown error'}`, 'var(--alert)');

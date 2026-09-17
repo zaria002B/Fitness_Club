@@ -25,15 +25,15 @@ first scan asks for a roll number, every scan after that is automatic.
 7. **My Progress page (member-facing).** `my-progress.html` — any member can see their own total check-ins, current streak, this week's count, a weekly bar chart, and their own personal year-long heatmap. It recognizes them the same way check-in does: whichever phone already checked in before is remembered automatically.
 8. **Self-registration on first scan.** A member no longer has to be pre-added by an admin. The first time someone scans the entrance QR on their phone, if their roll number isn't registered yet, they just add their name right there and it registers automatically — practical once you've got 50+ members. Admins can still use **Add Member** to pre-register people if they want to (e.g. reserving official roll numbers ahead of time), but it's optional now.
 9. **Daily motivational quote.** After checking in, members see an original "quote of the day" — the same one for everyone, rotating automatically by date.
-10. **Location-gated check-in.** Every check-in (not just the first) now requires the phone's real GPS location to be within ~120 meters of the gym. This closes the "photograph the QR code and check in from my room" loophole — see the section below for details and its limits.
+10. **Location-gated check-in.** Every check-in (not just the first) now requires the phone's real GPS location to be within ~35 meters of the gym. This closes the "photograph the QR code and check in from my room" loophole — see the section below for details and its limits.
 
 ### About the location check
 
-`checkin.html` asks the browser for the phone's GPS location and compares it against the gym's real coordinates (currently set to NIT Nagaland's gym at `25.789581, 93.775825`, with a 120m allowed radius). If the phone is further away than that, or if location access is denied, check-in is blocked with an explanation.
+`checkin.html` asks the browser for the phone's GPS location and compares it against the gym's real coordinates (currently set to NIT Nagaland's gym at `25.789581, 93.775825`, with a 35m allowed radius — tightened down since the gym is a single small room, about 30×20). If the phone is further away than that, or if location access is denied, check-in is blocked with an explanation.
 
 **Worth knowing:**
 - The person has to grant location permission the first time their browser asks. If they deny it, they can't check in until they re-enable it in their browser's site settings.
-- GPS indoors can drift by 20–100m depending on the building and phone. If real members at the gym are getting incorrectly blocked as "too far," the fix is increasing `MAX_DISTANCE_METERS` in `checkin.html` (currently 120).
+- GPS indoors can drift by 20–100m depending on the building and phone. With a tight 35m radius on a small room, this is the setting most likely to need tuning — if real members at the gym get incorrectly blocked as "too far," increase `MAX_DISTANCE_METERS` in `checkin.html` a bit at a time (try 50, then 60) until legitimate check-ins stop failing.
 - This stops the casual case (checking in from a dorm room), but someone with a location-spoofing tool on their phone could still fake it — same caveat as everything else in this system. There's no perfectly unspoofable free option; if it ever becomes worth the extra effort, the strongest next step is a rotating QR code displayed on a screen at the gym entrance (a code that expires every couple of minutes, so an old photo stops working) — happy to build that if this isn't enough.
 - To adjust the gym's coordinates or radius later, edit the three constants near the top of `checkin.html`'s script: `GYM_LAT`, `GYM_LNG`, `MAX_DISTANCE_METERS`.
 

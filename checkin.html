@@ -32,6 +32,36 @@
   const content = document.getElementById('content');
   const STORAGE_KEY = 'fitness_club_member_roll';
 
+  // NIT Nagaland gym — check-in only works within this radius.
+  // To adjust: update these three numbers.
+  const GYM_LAT = 25.789581;
+  const GYM_LNG = 93.775825;
+  const MAX_DISTANCE_METERS = 120;
+
+  function distanceMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const toRad = deg => deg * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function getCurrentLocation() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject({ code: 0, message: 'Location is not supported on this device or browser.' });
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve(pos.coords),
+        err => reject(err),
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      );
+    });
+  }
+
   // Original lines written for this app — not quoting any real person, so
   // there's no copyright issue reproducing them. One is picked based on
   // the date, so everyone sees the same "quote of the day" and it changes
@@ -141,7 +171,25 @@
   }
 
   async function checkIn(roll, fallbackName) {
-    renderStatus('CHECKING IN…', 'One moment.', 'var(--ink)');
+    renderStatus('CHECKING IN…', 'Confirming your location.', 'var(--ink)');
+
+    let coords;
+    try {
+      coords = await getCurrentLocation();
+    } catch (err) {
+      let msg = 'We need your location to check you in at the gym. Allow location access and scan again.';
+      if (err.code === 1) msg = 'Location access was denied. Enable location for this site in your browser settings, then scan again.';
+      else if (err.code === 2) msg = 'Could not determine your location. Make sure GPS/location services are turned on, then try again.';
+      else if (err.code === 3) msg = 'Location request timed out. Try again.';
+      renderStatus('CAN\'T CHECK IN', msg, 'var(--alert)');
+      return;
+    }
+
+    const distance = distanceMeters(coords.latitude, coords.longitude, GYM_LAT, GYM_LNG);
+    if (distance > MAX_DISTANCE_METERS) {
+      renderStatus('TOO FAR FROM THE GYM', `You need to be at the gym to check in — you appear to be about ${Math.round(distance)}m away.`, 'var(--alert)');
+      return;
+    }
 
     try {
       const memberSnap = await getDoc(doc(db, 'members', roll));

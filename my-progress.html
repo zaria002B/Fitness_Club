@@ -74,7 +74,7 @@
   function renderNotRegistered() {
     content.innerHTML = `
       <div style="max-width:440px; text-align:center; margin:0 auto;">
-        <h1 class="display" style="font-size:48px; margin:0 0 16px;">NO PROGRESS YET</h1>
+        <h1 class="display" style="font-size:clamp(32px, 8vw, 48px); margin:0 0 16px;">NO PROGRESS YET</h1>
         <p style="color:var(--ink-dim); font-size:16px; margin-bottom:24px;">
           This phone hasn't checked in before. Scan the entrance QR code at the gym once, and your progress will show up here from then on.
         </p>
@@ -188,7 +188,7 @@
     const thisWeek = computeThisWeek(datesSet);
 
     content.innerHTML = `
-      <h1 class="display" style="font-size:56px; margin:0 0 4px;">MY PROGRESS</h1>
+      <h1 class="display" style="font-size:clamp(34px, 9vw, 56px); margin:0 0 4px;">MY PROGRESS</h1>
       <p style="color:var(--ink-dim); font-size:16px; margin-bottom:32px;">${full_name} · Roll ${roll}</p>
 
       <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:32px;">

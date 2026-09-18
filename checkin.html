@@ -34,9 +34,9 @@
 
   // NIT Nagaland gym — check-in only works within this radius.
   // To adjust: update these three numbers.
-  const GYM_LAT = 25.789610;
-  const GYM_LNG = 93.775785;
-  const MAX_DISTANCE_METERS = 20;
+  const GYM_LAT = 25.789581;
+  const GYM_LNG = 93.775825;
+  const MAX_DISTANCE_METERS = 35;
 
   function distanceMeters(lat1, lon1, lat2, lon2) {
     const R = 6371000;
@@ -108,14 +108,14 @@
 
   function renderStatus(titleText, bodyHtml, color) {
     content.innerHTML = `
-      <h1 class="display" style="font-size:56px; margin:0 0 24px; color:${color};">${titleText}</h1>
+      <h1 class="display" style="font-size:clamp(34px, 9vw, 56px); margin:0 0 24px; color:${color};">${titleText}</h1>
       <div style="font-size:16px; color:var(--ink-dim);">${bodyHtml}</div>
     `;
   }
 
   function renderStatusWithQuote(titleText, bodyHtml, color) {
     content.innerHTML = `
-      <h1 class="display" style="font-size:56px; margin:0 0 24px; color:${color};">${titleText}</h1>
+      <h1 class="display" style="font-size:clamp(34px, 9vw, 56px); margin:0 0 24px; color:${color};">${titleText}</h1>
       <div style="font-size:16px; color:var(--ink-dim); margin-bottom:32px;">${bodyHtml}</div>
       <div class="card" style="text-align:left;">
         <div style="font-size:11px; letter-spacing:0.06em; color:var(--volt); margin-bottom:8px;">QUOTE OF THE DAY</div>
@@ -126,7 +126,7 @@
 
   function renderSetupForm(errorMsg) {
     content.innerHTML = `
-      <h1 class="display" style="font-size:48px; margin:0 0 8px;">WHO'S CHECKING IN?</h1>
+      <h1 class="display" style="font-size:clamp(32px, 8vw, 48px); margin:0 0 8px;">WHO'S CHECKING IN?</h1>
       <p style="color:var(--ink-dim); margin-bottom:28px;">First time on this phone. Already registered? Just enter your roll number. New here? Add your name too — you'll only ever need to do this once.</p>
       <form id="setup-form">
         <input type="text" id="name-input" placeholder="Full name (only needed if you're new)" autocomplete="off" style="margin-bottom:12px;">
@@ -187,7 +187,7 @@
 
     const distance = distanceMeters(coords.latitude, coords.longitude, GYM_LAT, GYM_LNG);
     if (distance > MAX_DISTANCE_METERS) {
-      renderStatus("DON'T BE A BI*CH GO TO THE FU*KING GYM!!  ", `You need to be at the gym to checkin.`," ", 'var(--alert)');
+      renderStatus('TOO FAR FROM THE GYM', `You need to be at the gym to check in — you appear to be about ${Math.round(distance)}m away.`, 'var(--alert)');
       return;
     }
 

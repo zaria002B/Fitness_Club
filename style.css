@@ -155,3 +155,42 @@ tr:hover td { background: var(--surface-2); }
   font-size: 13px;
   margin-top: 64px;
 }
+
+/* ---------- Mobile ---------- */
+@media (max-width: 640px) {
+  .wrap {
+    padding: 0 16px;
+  }
+
+  .topbar .wrap {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+  }
+
+  .nav a {
+    margin-left: 0;
+  }
+
+  .stat-num {
+    font-size: 44px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  table {
+    font-size: 13px;
+  }
+
+  th, td {
+    padding: 8px;
+  }
+}

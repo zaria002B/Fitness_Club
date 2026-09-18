@@ -133,7 +133,7 @@
       let cellsHtml = '';
       const monthLabel = cursor.getMonth() !== lastMonth ? cursor.toLocaleString('default', { month: 'short' }) : '';
       if (cursor.getMonth() !== lastMonth) lastMonth = cursor.getMonth();
-      monthsHtml += `<div style="font-size:10px; color:var(--ink-dim); height:12px; white-space:nowrap;">${monthLabel}</div>`;
+      monthsHtml += `<div style="font-size:10px; color:var(--ink-dim); height:12px; width:12px; flex:0 0 12px; overflow:visible; white-space:nowrap;">${monthLabel}</div>`;
 
       for (let i = 0; i < 7; i++) {
         const cellDate = new Date(cursor);

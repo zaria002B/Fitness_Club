@@ -435,6 +435,9 @@
       monthLabel.style.fontSize = '10px';
       monthLabel.style.color = 'var(--ink-dim)';
       monthLabel.style.height = '12px';
+      monthLabel.style.width = '12px';
+      monthLabel.style.flex = '0 0 12px';
+      monthLabel.style.overflow = 'visible';
       monthLabel.style.whiteSpace = 'nowrap';
       if (cursor.getMonth() !== lastMonth) {
         monthLabel.textContent = cursor.toLocaleString('default', { month: 'short' });

@@ -410,8 +410,9 @@
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const start = new Date(today);
-    start.setDate(start.getDate() - 364);
+    // Start at the 1st of the month 11 months ago, so the grid covers
+    // exactly 12 distinct calendar months with no month name repeating.
+    const start = new Date(today.getFullYear(), today.getMonth() - 11, 1);
     start.setDate(start.getDate() - start.getDay()); // back up to the Sunday on/before start
 
     function levelFor(count) {
@@ -424,6 +425,9 @@
 
     let cursor = new Date(start);
     let lastMonth = -1;
+    let weekIndex = 0;
+    let lastLabelWeekIndex = -99;
+    const MIN_LABEL_GAP = 3; // minimum columns between two month labels, so text can't overlap
 
     while (cursor <= today) {
       const weekCol = document.createElement('div');
@@ -439,11 +443,17 @@
       monthLabel.style.flex = '0 0 12px';
       monthLabel.style.overflow = 'visible';
       monthLabel.style.whiteSpace = 'nowrap';
-      if (cursor.getMonth() !== lastMonth) {
+      if (cursor.getMonth() !== lastMonth && (weekIndex - lastLabelWeekIndex) >= MIN_LABEL_GAP) {
         monthLabel.textContent = cursor.toLocaleString('default', { month: 'short' });
+        lastMonth = cursor.getMonth();
+        lastLabelWeekIndex = weekIndex;
+      } else if (cursor.getMonth() !== lastMonth) {
+        // Still a new month, just too close to the last label to show text
+        // without overlapping — skip the label but keep the month tracked.
         lastMonth = cursor.getMonth();
       }
       monthsRow.appendChild(monthLabel);
+      weekIndex++;
 
       for (let i = 0; i < 7; i++) {
         const cellDate = new Date(cursor);

@@ -118,22 +118,33 @@
   function renderHeatmap(datesSet) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const start = new Date(today);
-    start.setDate(start.getDate() - 364);
+    // Start at the 1st of the month 11 months ago, so the grid covers
+    // exactly 12 distinct calendar months with no month name repeating.
+    const start = new Date(today.getFullYear(), today.getMonth() - 11, 1);
     start.setDate(start.getDate() - start.getDay());
 
     function levelFor(has) { return has ? 4 : 0; }
 
     let cursor = new Date(start);
     let lastMonth = -1;
+    let weekIndex = 0;
+    let lastLabelWeekIndex = -99;
+    const MIN_LABEL_GAP = 3; // minimum columns between two month labels, so text can't overlap
     let monthsHtml = '';
     let colsHtml = '';
 
     while (cursor <= today) {
       let cellsHtml = '';
-      const monthLabel = cursor.getMonth() !== lastMonth ? cursor.toLocaleString('default', { month: 'short' }) : '';
-      if (cursor.getMonth() !== lastMonth) lastMonth = cursor.getMonth();
+      let monthLabel = '';
+      if (cursor.getMonth() !== lastMonth && (weekIndex - lastLabelWeekIndex) >= MIN_LABEL_GAP) {
+        monthLabel = cursor.toLocaleString('default', { month: 'short' });
+        lastMonth = cursor.getMonth();
+        lastLabelWeekIndex = weekIndex;
+      } else if (cursor.getMonth() !== lastMonth) {
+        lastMonth = cursor.getMonth();
+      }
       monthsHtml += `<div style="font-size:10px; color:var(--ink-dim); height:12px; width:12px; flex:0 0 12px; overflow:visible; white-space:nowrap;">${monthLabel}</div>`;
+      weekIndex++;
 
       for (let i = 0; i < 7; i++) {
         const cellDate = new Date(cursor);

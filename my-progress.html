@@ -126,37 +126,39 @@
     function levelFor(has) { return has ? 4 : 0; }
 
     let cursor = new Date(start);
-    let lastMonth = -1;
-    let weekIndex = 0;
-    let lastLabelWeekIndex = -99;
-    const MIN_LABEL_GAP = 3; // minimum columns between two month labels, so text can't overlap
     let monthsHtml = '';
     let colsHtml = '';
 
     while (cursor <= today) {
       let cellsHtml = '';
+
+      // Label this week only if one of its 7 days is the 1st of a month.
+      // This is unambiguous regardless of how the calendar lines up with
+      // week boundaries, so it can't produce a duplicate, missing, or
+      // overlapping label the way "new month since last label" could.
       let monthLabel = '';
-      if (cursor.getMonth() !== lastMonth && (weekIndex - lastLabelWeekIndex) >= MIN_LABEL_GAP) {
-        monthLabel = cursor.toLocaleString('default', { month: 'short' });
-        lastMonth = cursor.getMonth();
-        lastLabelWeekIndex = weekIndex;
-      } else if (cursor.getMonth() !== lastMonth) {
-        lastMonth = cursor.getMonth();
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(cursor);
+        d.setDate(d.getDate() + i);
+        if (d.getDate() === 1) {
+          monthLabel = d.toLocaleString('default', { month: 'short' });
+          break;
+        }
       }
       monthsHtml += `<div style="font-size:10px; color:var(--ink-dim); height:12px; width:12px; flex:0 0 12px; overflow:visible; white-space:nowrap;">${monthLabel}</div>`;
-      weekIndex++;
 
       for (let i = 0; i < 7; i++) {
         const cellDate = new Date(cursor);
+        cellDate.setDate(cellDate.getDate() + i);
         if (cellDate > today) {
           cellsHtml += `<div class="heat-cell" style="background:transparent;"></div>`;
         } else {
           const has = datesSet.has(dateKey(cellDate));
           cellsHtml += `<div class="heat-cell heat-${levelFor(has)}" title="${cellDate.toDateString()}${has ? ' — checked in' : ''}"></div>`;
         }
-        cursor.setDate(cursor.getDate() + 1);
       }
       colsHtml += `<div style="display:flex; flex-direction:column; gap:3px;">${cellsHtml}</div>`;
+      cursor.setDate(cursor.getDate() + 7);
     }
 
     return `
